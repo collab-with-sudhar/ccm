@@ -1,0 +1,201 @@
+UFYJM438JUJ5QT7L4FNUQDT4
+
+====== HADOOP INSTALLATION =======
+
+sudo apt update
+wget https://dlcdn.apache.org/hadoop/common/hadoop-3.3.6/hadoop-3.3.6.tar.gz
+tar -xvzf hadoop-3.3.6.tar.gz
+ls
+mv hadoop-3.3.6 hadoop
+sudo apt install openjdk-11-jdk
+java --version
+cd hadoop
+ls
+mkdir -p { datanode,namenode }
+dirname $(dirname $(readlink -f $(which java)))/usr/lib/jvm/java-11-openjdk-amd64
+dirname $(dirname $(dirname ${readlink -f $(which java)}))
+gedit path.txt
+cd ..
+pwd
+cd /hadoop/lib/native
+gedit ~/.bashrc
+
+export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+export HADOOP_HOME=/home/username/hadoop
+export HADOOP_INSTALL=$HADOOP_HOME
+export HADOOP_MAPRED_HOME=$HADOOP_HOME
+export HADOOP_COMMON_HOME=$HADOOP_HOME
+export HADOOP_HDFS_HOME=$HADOOP_HOME
+export HADOOP_YARN_HOME=$HADOOP_HOME
+export HADOOP_COMMON_LIB_NATIVE=$HADOOP_HOME/lib/native
+export PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin
+export HADOOP_OPTS="-Djava.library.path=$HADOOP_HOME/lib/native"S
+
+source ~/.bashrc
+cd ..
+cd etc
+cd hadoop
+ls
+gedit hadoop-env.sh add below line
+JAVA_HOME =/usr/lib/jvm/java-11-openjdk-amd64 in line 54
+
+gedit core-site.xml
+gedit hdfs-site.xml
+gedit mapred-site.xml
+gedit yarn-site.xml
+
+
+//generate key
+
+ssh-keygen -t rsa
+
+cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
+chmod 640 ~/.ssh/authorized_keys
+
+start-dfs.sh
+start-yarn.sh
+jps
+
+hdfs namenode -format
+
+//go to browser type localhost:9870 to check namenode info
+//resource managerr in port 8088
+
+//execution of word count program
+
+nano cloudwordcoun.txt
+
+hdfs dfs -mkdir -p /user/name/input
+ls
+hdfs dfs -put cloudwordcoun.txt /user/name/input
+hdfs dfs -ls /user/name/input
+
+mkdir wordcount
+cd wordcount
+gedit wordcoun.java
+
+import java.io.IOException;
+import java.util.StringTokenizer;
+public class WordCount {
+public static class TokenizerMapper extends Mapper<Object, Text, Text,
+IntWritable>{
+private finalstatic IntWritable one = new IntWritable(1);
+private Text word = new Text();
+public void map(Object key, Text value, Context context) throwsIOException,
+InterruptedException {
+StringTokenizer itr = new StringTokenizer(value.toString());
+while (itr.hasMoreTokens()) {word.set(itr.nextToken());
+context.write(word, one);}}}
+public static classIntSumReducer
+extends Reducer<Text,IntWritable,Text,IntWritable> {
+private IntWritable result = new IntWritable();
+public void reduce(Text key, Iterable<IntWritable> values,Context context)
+throws IOException,InterruptedException {
+int sum = 0;
+for(IntWritable val : values) {
+sum += val.get();}
+result.set(sum);
+context.write(key, result);}}
+public static void main(String[] args) throws Exception {
+Configuration conf = new Configuration();
+Job job = Job.getInstance(conf, "word count");
+job.setJarByClass(WordCount.class);
+job.setMapperClass(TokenizerMapper.class);
+job.setCombinerClass(IntSumReducer.class);
+job.setReducerClass(IntSumReducer.class);
+job.setOutputKeyClass(Text.class);
+job.setOutputValueClass(IntWritable.class);
+FileInputFormat.addInputPath(job, new Path(args[0]));
+FileOutputFormat.setOutputPath(job, new Path(args[1]));
+System.exit(job.waitForCompletion(true) ? 0 : 1);}}
+
+javac -classpath $(hadoop classpath) -d . wordcoun.java
+jar -cvf wordcoun.jar *.class
+hadoop jar wordcount.jsr wordcoun /user/name/input /user/name/output
+hdfs dfs -ls /user/name/output
+hdfs dfs -cat /user/name/output/part-r-00000
+storp-yarn.sh
+
+
+===== SPARK INSTALLATION=====
+sudo apt update
+sudo apt-get install default-jdk
+sudo apt-get install scala
+
+
+//spark installation
+wget https://mirror.lyrahosting.com/apache/spark/spark-3.5.0/spark-3.5.0-bin-hadoop3.tgz
+
+
+//For Extraction:
+$ tar -xvzf spark-3.5.0-bin-hadoop3.tgz
+
+sudo su
+cd /home/ubuntu
+mv spark-3.5.0-bin-hadoop3 /home/ubuntu/spark
+ls
+cd spark
+ls
+
+//environment setup
+nano ~/.bashrc
+export SPARK_HOME=/home/ubuntu/spark/spark-3.5.0-bin-hadoop3
+export PATH=$PATH:$SPARK_HOME/bin:
+$SPARK_HOME/sbin
+
+source ~/.bashrc
+
+spark-shell
+
+//input
+ val inputfile = sc.textfile("/home/ubuntu/spark/in.txt")
+
+val counts=inputfile.flatMap(line=>line.split(" ")).map(word=>(word,1)).reduceByKey(_+_)
+
+counts.collect().foreach(println)
+counts.saveAsTextFile("output")
+
+exit()
+
+
+====MPI AND OPENMP====
+sudo apt install python3
+sudo apt install -y -qq mpich
+sudo apt install python3-pip
+pip install mpi4py
+
+gedit mpi_ex.py
+from mpi4py import MPI
+comm=MPI.COMM_WORLD
+rank=comm.Get_rank()
+size=comm.Get_size()
+print(f"Hello from process {rank} out of {size}")
+mpirun -np 4 python3 mpi_ex.py
+
+_________________________________
+
+openmp
+
+sudo apt-get install libomp-dev
+
+//hello_omp.cpp
+#include <iostream>
+#include <omp.h>
+
+int main(){
+	omp_set_num_threads(4);
+	{
+		int thread_id=omp_get_thread_num();
+		int total_threads = omp_get_num_threads();
+		std::cout << "Hello world from thread" << thread_id
+				  << "out of " << total_threads << "threads.\n";
+
+	}
+	return 0;
+}
+//run this file
+g++ -fopenmp hello_omp.cpp -o hello_omp.out
+
+
+
+
